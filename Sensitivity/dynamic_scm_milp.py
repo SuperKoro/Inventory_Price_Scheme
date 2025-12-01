@@ -266,8 +266,8 @@ class SupplyChainModel:
             print("COST BREAKDOWN:")
             print(f"  Purchasing:   {purch:,.0f}")
             print(f"  Production:   {prod:,.0f}")
-            print(f"  Holding:      {hold:,.0f} (Target: ~13,450)")
-            print(f"  Transport:    {transp:,.0f} (Target: ~10,374)")
+            print(f"  Holding:      {hold:,.0f}")
+            print(f"  Transport:    {transp:,.0f}")
             print(f"  Sum check:    {purch + prod + hold + transp:,.0f}")
             print("===================================")
 
