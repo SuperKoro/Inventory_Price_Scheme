@@ -27,10 +27,10 @@ class SupplyChainData:
 
         # Năng lực (Capacities) - CỐ ĐỊNH (Theo hình ảnh Table 5)
         self.inventory_capacity = 200 
-        self.prod_capacity =  [270, 270, 270, 270, 270] # Cố định 270
-        self.trans_capacity = [300, 300, 300, 300, 300] # Cố định 300
+        self.prod_capacity =  [270, 270, 270, 270, 270] 
+        self.trans_capacity = [300, 300, 300, 300, 300] 
 
-        # --- 3. DỮ LIỆU NHÀ CUNG CẤP (SUPPLIERS) ---
+        # --- 3. DỮ IỆU NHÀ CUNG CẤP (SUPPLIERS) 
         self.global_min_order_first = 50
         self.global_min_order_later = 20
         self.global_max_order_size = 500

@@ -8,7 +8,7 @@ class SupplyChainModel:
         if not self.solver:
             raise Exception("SCIP backend not found.")
         self.infinity = self.solver.infinity()
-        
+        #khai báo decision variables
         self.q, self.z = {}, {}
         self.x, self.w_prod = {}, {}
         self.y, self.w_trans = {}, {}
@@ -18,26 +18,33 @@ class SupplyChainModel:
 
     def create_variables(self):
         print("Creating variables...")
-        T = self.data.T
+        T = self.data.T # thời gian t 
         for t in range(T):
             # Purchasing
-            for j_idx, supplier in enumerate(self.data.suppliers):
+            for j_idx, supplier in enumerate(self.data.suppliers): # khai báo các biến quyết định mua hàng
+                # DECISION VARIABLE: q[j,t] (Số lượng mua). Biến liên tục (NumVar), >= 0.
                 self.q[j_idx, t] = self.solver.NumVar(0, self.infinity, f'q_{j_idx}_{t}')
+                # DECISION VARIABLE: z[j,t] (Biến nhị phân, 1 nếu mua, 0 nếu không mua)
                 self.z[j_idx, t] = self.solver.BoolVar(f'z_{j_idx}_{t}')
             # Production
-            self.x[t] = self.solver.NumVar(0, self.infinity, f'x_{t}')
-            self.w_prod[t] = self.solver.BoolVar(f'w_prod_{t}')
+            self.x[t] = self.solver.NumVar(0, self.infinity, f'x_{t}') # DECISION VARIABLE: x[t] (Số lượng sản xuất). Biến liên tục (NumVar), >= 0.
+            self.w_prod[t] = self.solver.BoolVar(f'w_prod_{t}') # DECISION VARIABLE: w_prod[t] (Biến nhị phân, 1 nếu sản xuất, 0 nếu không sản xuất)
             # Inventory & Transport
-            for k in range(1, self.data.K + 1):
-                self.i[k, t] = self.solver.NumVar(0, self.data.inventory_capacity, f'i_{k}_{t}')
-                if k < self.data.K:
+            for k in range(1, self.data.K + 1): # khai báo các biến quyết định tồn kho và vận chuyển
+                # DECISION VARIABLE: i[k,t] (Mức tồn kho). Cận trên là inventory_capacity (PARAMETER).
+                self.i[k, t] = self.solver.NumVar(0, self.data.inventory_capacity, f'i_{k}_{t}')    
+                if k < self.data.K: # khai báo các biến quyết định vận chuyển
+                    # DECISION VARIABLE: y[k,t] (Số lượng vận chuyển). Biến liên tục (NumVar), >= 0.
                     self.y[k, t] = self.solver.NumVar(0, self.infinity, f'y_{k}_{t}')
+                    # DECISION VARIABLE: w_trans[k,t] (Biến nhị phân, 1 nếu vận chuyển, 0 nếu không vận chuyển)
                     self.w_trans[k, t] = self.solver.BoolVar(f'w_trans_{k}_{t}')
 
         # Pricing Scheme
-        for j_idx, supplier in enumerate(self.data.suppliers):
+        for j_idx, supplier in enumerate(self.data.suppliers): # khai báo các biến quyết định giá
             for g, _ in enumerate(supplier['price_intervals']):
+                # DECISION VARIABLE: s_price[j_idx, g] (Biến nhị phân, 1 nếu chọn giá, 0 nếu không chọn giá)
                 self.s_price[j_idx, g] = self.solver.BoolVar(f's_{j_idx}_{g}')
+                # DECISION VARIABLE: r_price[j_idx, g] (Giá trị của giá)
                 self.r_price[j_idx, g] = self.solver.NumVar(0, self.infinity, f'r_{j_idx}_{g}')
 
         # Freight Rates (Chỉ tạo biến cho Stage 3->4, tức là k=3)
@@ -84,28 +91,31 @@ class SupplyChainModel:
         
         # 1. SUPPLIER
         for j_idx, supplier in enumerate(self.data.suppliers):
-            total_purchased_cumulative = 0
+            total_purchased_cumulative = 0 # Biến để tính cumulative purchased quantity
             for t in range(T):
                 qty = self.q[j_idx, t]
-                # Min Order & Max Order
+                # CONSTRAINT: Số lượng mua >= Min Order * Biến chọn z
+                # supplier['min_order'] là PARAMETER.
                 self.solver.Add(qty >= supplier['min_order'] * self.z[j_idx, t])
+                # CONSTRAINT: Số lượng mua <= Max Order * Biến chọn z
                 self.solver.Add(qty <= self.data.global_max_order_size * self.z[j_idx, t])
-                
+                # CONSTRAINT: Tổng mua tích lũy <= Năng lực cung ứng tích lũy (PARAMETER)
                 # Capacity
                 total_purchased_cumulative += qty
                 self.solver.Add(total_purchased_cumulative <= supplier['cumulative_capacity'][t])
                 
-                # CHẶN MUA (Logic Offer hết hạn)
+                # CONSTRAINT: Logic chặn mua nếu offer hết hạn (Capacity không tăng)
                 if t > 0:
                     added_cap = supplier['cumulative_capacity'][t] - supplier['cumulative_capacity'][t-1]
                     if added_cap <= 0: self.solver.Add(qty == 0)
                 else:
                     if supplier['cumulative_capacity'][0] == 0: self.solver.Add(qty == 0)
-
-            # Pricing Linearization
-            total_qty_horizon = sum(self.q[j_idx, t] for t in range(T))
-            intervals = supplier['price_intervals']
-            self.solver.Add(sum(self.s_price[j_idx, g] for g in range(len(intervals))) <= 1)
+                # CONSTRAINT: Tuyến tính hóa chi phí (Linearization)
+                # Tổng lượng mua thực tế == Tổng lượng mua tính toán từ các khoảng giá
+                # Pricing Linearization
+                total_qty_horizon = sum(self.q[j_idx, t] for t in range(T))
+                intervals = supplier['price_intervals']
+                self.solver.Add(sum(self.s_price[j_idx, g] for g in range(len(intervals))) <= 1)
             
             expr_qty = 0
             for g, interval in enumerate(intervals):
@@ -293,4 +303,4 @@ if __name__ == "__main__":
     
     # 4. Giải
     model.solve()
-    '''
+'''
