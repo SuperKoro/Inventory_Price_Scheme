@@ -47,7 +47,37 @@ class SupplyChainModel:
                 for e, _ in enumerate(transport_intervals):
                     self.f_freight[k, t, e] = self.solver.BoolVar(f'f_{k}_{t}_{e}')
                     self.y_freight[k, t, e] = self.solver.NumVar(0, self.infinity, f'y_fr_{k}_{t}_{e}')
+    '''
+    def force_paper_plan(self):
+        """
+        Hàm dùng để DEBUG/VALIDATE.
+        Ép buộc model phải mua đúng số lượng như Table 7 trong paper.
+        """
+        print("\n!!! WARNING: FORCING PURCHASING PLAN FROM PAPER !!!")
+        
+        # Dictionary lưu kế hoạch mục tiêu: (Period_index, Supplier_index): Quantity
+        # Period 0 = Kỳ 1, Period 4 = Kỳ 5
+        # Sup 0 = Sup1_Off1, Sup 1 = Sup1_Off2, Sup 2 = Sup2, Sup 3 = Sup3
+        target_plan = {
+            (0, 0): 270, # Kỳ 1, Sup1_Off1
+            (1, 0): 180, # Kỳ 2, Sup1_Off1
+            (1, 2): 60,  # Kỳ 2, Sup2
+            (2, 3): 400, # Kỳ 3, Sup3
+            (3, 1): 140, # Kỳ 4, Sup1_Off2
+        }
 
+        # Duyệt qua tất cả các biến q và ép giá trị
+        for t in range(self.data.T):
+            for j_idx in range(len(self.data.suppliers)):
+                # Lấy giá trị target, nếu không có trong dict thì mặc định là 0
+                target_qty = target_plan.get((t, j_idx), 0)
+                
+                # Thêm ràng buộc cứng: q == target_qty
+                self.solver.Add(self.q[j_idx, t] == target_qty)
+                
+                if target_qty > 0:
+                    print(f"  -> Forced q[{j_idx}, {t}] = {target_qty}")
+    '''
     def add_constraints(self):
         print("Adding constraints...")
         T = self.data.T
@@ -147,25 +177,20 @@ class SupplyChainModel:
         for t in range(T):
             total += self.data.prod_fixed_cost[t] * self.w_prod[t]
             total += self.data.prod_var_cost[t] * self.x[t]
-
-        # 3. Holding (CẬP NHẬT: Tính đủ các thành phần ẩn)
-        # A. Phí tồn kho đầu kỳ (Initial Inventory tại Stage 4)
-        total += 100 * 6 
-        
+        # 3. Holding (CẬP NHẬT MỚI)
+        # Lưu ý: Bài báo không tính phí holding cho Initial Inventory đầu kỳ 1 (t=0)
+        # Chỉ tính i_k^t (cuối kỳ) và y_k^t (dòng chảy trong kỳ)
         for t in range(T):
-            # B. Tồn kho tại các kho (Node Inventory)
+            # A. Node Inventory (i_k^t)
             for k in range(1, self.data.K + 1):
                 total += self.data.holding_cost[t] * self.i[k, t]
             
-            # C. Tồn kho dòng chảy (Flow Inventory)
-            # Stage 2->3: Hàng đi trên đường (Transit), leadtime > 0
-            lt_23 = self.data.lead_times.get((2, 3), 0)
-            if lt_23 > 0:
-                total += self.y[2, t] * self.data.holding_cost[t] * lt_23
-
-            # Stage 1->2: Hàng luân chuyển nội bộ (WIP). 
-            # Paper tính phí giữ hàng cho cả dòng này dù leadtime=0.
-            total += self.y[1, t] * self.data.holding_cost[t] * 1
+            # B. In-transit Inventory (y_k^t)
+            # Theo bài báo Eq 15: k thuộc Kd = {2, 3}
+            # Tức là tính cho y_2 (Stage 2->3) và y_3 (Stage 3->4)
+            for k in [2, 3]: 
+                total += self.y[k, t] * self.data.holding_cost[t]
+            
 
         # 4. Transportation (Chỉ tính cho k=3)
         transport_intervals = self.data.freight_actual
@@ -208,14 +233,16 @@ class SupplyChainModel:
                          self.data.prod_var_cost[t] * self.x[t].solution_value())
 
             # Hold (Cập nhật logic hiển thị)
-            hold += 100 * 6
+            hhold = 0.0
             for t in range(T):
+                # Node Inventory
                 for k in range(1, self.data.K + 1):
                     hold += self.data.holding_cost[t] * self.i[k, t].solution_value()
-                # Transit Stage 2->3
-                hold += self.y[2, t].solution_value() * self.data.holding_cost[t] * 1
-                # WIP Stage 1->2
-                hold += self.y[1, t].solution_value() * self.data.holding_cost[t] * 1
+                
+                # In-transit Inventory (KD = {2, 3})
+                # Stage 2->3 AND Stage 3->4
+                for k in [2, 3]:
+                    hold += self.y[k, t].solution_value() * self.data.holding_cost[t]
 
             # Transp (Chỉ k=3)
             intervals = self.data.freight_actual
@@ -241,10 +268,29 @@ class SupplyChainModel:
                 print(f"{t+1:<4} {vals[0]:<8.0f} {vals[1]:<8.0f} {vals[2]:<6.0f} {vals[3]:<6.0f}")
         else:
             print('No optimal solution found.')
-            
+#'''
 if __name__ == "__main__":
     model = SupplyChainModel(SupplyChainData())
     model.create_variables()
     model.add_constraints()
     model.set_objective()
     model.solve()
+#'''
+'''
+if __name__ == "__main__":
+    data = SupplyChainData()
+    model = SupplyChainModel(data)
+    
+    # 1. Tạo biến & Ràng buộc cơ bản
+    model.create_variables()
+    model.add_constraints()
+    
+    # 2. Thiết lập mục tiêu
+    model.set_objective()
+    
+    # 3. [VALIDATION STEP] Bật dòng này để ép kế hoạch giống Paper
+    model.force_paper_plan()  # <--- THÊM DÒNG NÀY
+    
+    # 4. Giải
+    model.solve()
+    '''

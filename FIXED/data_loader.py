@@ -99,5 +99,5 @@ class SupplyChainData:
             {"min": 63,  "max": 112, "fixed_cost": 0.0,  "var_cost_per_unit": 12.5},
             {"min": 113, "max": 124, "fixed_cost": 1411, "var_cost_per_unit": 0.0},
             {"min": 125, "max": 254, "fixed_cost": 0.0,  "var_cost_per_unit": 11.3},
-            {"min": 255, "max": 312, "fixed_cost": 2876, "var_cost_per_unit": 0.0}
+            {"min": 255, "max": 312, "fixed_cost": 2780, "var_cost_per_unit": 0.0}
         ]
