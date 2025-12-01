@@ -196,15 +196,15 @@ class SupplyChainModel:
 
         # 4. In-Transit Holding Cost (Phí tồn kho trên đường) 
         # Hàng đang đi từ Stage k sang k+1 cũng bị tính phí giữ hàng nếu lead time > 0
-        #for t in range(T):
-            #for k in range(1, self.data.K): # k=1,2,3
-                #if k < self.data.K:
+        for t in range(T):
+            for k in range(1, self.data.K): # k=1,2,3
+                if k < self.data.K:
                     # Lấy lead time của cung đường này
-                #lt = self.data.lead_times.get((k, k+1), 0)
-                    #if lt > 0:
+                    lt = self.data.lead_times.get((k, k+1), 0)
+                    if lt > 0:
                         # Phí = Lượng hàng * Phí đơn vị * Số kỳ trễ
                         # Giả sử phí giữ hàng trên đường = phí giữ hàng tại kho (holding_cost[t])
-                       # total += self.y[k, t] * self.data.holding_cost[t] * lt
+                        total += self.y[k, t] * self.data.holding_cost[t] * lt
 
         # 5. Transportation Cost (Cước vận chuyển)
         transport_intervals = self.data.freight_actual
@@ -215,7 +215,83 @@ class SupplyChainModel:
                     total += iv['var_cost_per_unit'] * self.y_freight[k, t, e]
 
         self.solver.Minimize(total)
+    def solve(self):
+        print("Solving...")
+        status = self.solver.Solve()
+        if status == pywraplp.Solver.OPTIMAL:
+            obj_val = self.solver.Objective().Value()
+            print("Objective value = ", obj_val)
+
+        # ========== BREAKDOWN CHI PHÍ ==========
+        T = self.data.T
+        purch = 0.0
+        prod = 0.0
+        hold = 0.0
+        transp = 0.0
+
+        # 1. Purchasing + Ordering cost
+        for j_idx, supplier in enumerate(self.data.suppliers):
+            intervals = supplier['price_intervals']
+
+            # incremental discount phần nguyên liệu
+            for g, interval in enumerate(intervals):
+                base_cost = 0.0
+                for pg in range(g):
+                    w = intervals[pg]['max_q'] - (0 if pg == 0 else intervals[pg-1]['max_q'])
+                    base_cost += w * intervals[pg]['price']
+                purch += (self.s_price[j_idx, g].solution_value() * base_cost +
+                          self.r_price[j_idx, g].solution_value() * interval['price'])
+
+            # primary + secondary ordering
+            is_selected = sum(self.s_price[j_idx, g].solution_value()
+                              for g in range(len(intervals)))
+            purch += supplier['primary_cost'] * is_selected
+
+            for t in range(T):
+                purch += supplier['secondary_cost'] * self.z[j_idx, t].solution_value()
+
+        # 2. Production cost
+        for t in range(T):
+            prod += (self.data.prod_fixed_cost[t] * self.w_prod[t].solution_value() +
+                     self.data.prod_var_cost[t] * self.x[t].solution_value())
+
+        # 3. Holding cost (tồn kho tại các kho)
+        for t in range(T):
+            for k in range(1, self.data.K + 1):
+                hold += self.data.holding_cost[t] * self.i[k, t].solution_value()
+
+        # 4. Transportation cost
+        transport_intervals = self.data.freight_actual
+        for t in range(T):
+            for k in range(1, self.data.K):
+                for e, iv in enumerate(transport_intervals):
+                    transp += (iv['fixed_cost'] * self.f_freight[k, t, e].solution_value() +
+                               iv['var_cost_per_unit'] * self.y_freight[k, t, e].solution_value())
+
+        print("COST BREAKDOWN:")
+        print(f"  Purchasing:   {purch}")
+        print(f"  Production:   {prod}")
+        print(f"  Holding:      {hold}")
+        print(f"  Transport:    {transp}")
+        print(f"  Sum check:    {purch + prod + hold + transp}")
+        print("===================================")
+        # ========== HẾT BREAKDOWN ==========
+
+        # Phần in purchasing plan như cũ
+        print("------------------------------")
+        print("PURCHASING PLAN:")
+        print("Per  Sup1_1   Sup1_2   Sup2   Sup3")
+        for t in range(T):
+            q1_1 = self.q[0, t].solution_value()
+            q1_2 = self.q[1, t].solution_value()
+            q2   = self.q[2, t].solution_value()
+            q3   = self.q[3, t].solution_value()
+            print(f"{t+1:<4}{int(round(q1_1)):>8}{int(round(q1_2)):>8}"
+                  f"{int(round(q2)):>8}{int(round(q3)):>8}")
         
+
+
+'''     
     def solve(self):
         print("Solving...")
         status = self.solver.Solve()
@@ -229,6 +305,7 @@ class SupplyChainModel:
                 print(f"{t+1:<4} {vals[0]:<8.0f} {vals[1]:<8.0f} {vals[2]:<6.0f} {vals[3]:<6.0f}")
         else:
             print('No optimal solution found.')
+'''
 #'''
 if __name__ == "__main__":
     model = SupplyChainModel(SupplyChainData())
@@ -243,16 +320,13 @@ if __name__ == "__main__":
     data = SupplyChainData()
     model = SupplyChainModel(data)
     
-    # 1. Tạo biến & Ràng buộc cơ bản
+    
     model.create_variables()
     model.add_constraints()
     
-    # 2. Thiết lập mục tiêu
     model.set_objective()
     
-    # 3. [VALIDATION STEP] Bật dòng này để ép kế hoạch giống Paper
     model.force_paper_plan()  # <--- THÊM DÒNG NÀY
     
-    # 4. Giải
     model.solve()
 '''
