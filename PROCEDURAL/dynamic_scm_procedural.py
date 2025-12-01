@@ -1,8 +1,3 @@
-"""
-PROCEDURAL VERSION - Inventory MILP Model
-Không sử dụng OOP, chỉ dùng functions thuần túy
-"""
-
 from ortools.linear_solver import pywraplp
 from data_loader import SupplyChainData
 
