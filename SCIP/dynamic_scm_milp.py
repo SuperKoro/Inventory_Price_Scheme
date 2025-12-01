@@ -196,15 +196,15 @@ class SupplyChainModel:
 
         # 4. In-Transit Holding Cost (Phí tồn kho trên đường) 
         # Hàng đang đi từ Stage k sang k+1 cũng bị tính phí giữ hàng nếu lead time > 0
-        for t in range(T):
-            for k in range(1, self.data.K): # k=1,2,3
-                if k < self.data.K:
+        #for t in range(T):
+            #for k in range(1, self.data.K): # k=1,2,3
+                #if k < self.data.K:
                     # Lấy lead time của cung đường này
-                    lt = self.data.lead_times.get((k, k+1), 0)
-                    if lt > 0:
+                #lt = self.data.lead_times.get((k, k+1), 0)
+                    #if lt > 0:
                         # Phí = Lượng hàng * Phí đơn vị * Số kỳ trễ
                         # Giả sử phí giữ hàng trên đường = phí giữ hàng tại kho (holding_cost[t])
-                        total += self.y[k, t] * self.data.holding_cost[t] * lt
+                       # total += self.y[k, t] * self.data.holding_cost[t] * lt
 
         # 5. Transportation Cost (Cước vận chuyển)
         transport_intervals = self.data.freight_actual
@@ -263,7 +263,7 @@ class SupplyChainModel:
         # 4. Transportation cost
         transport_intervals = self.data.freight_actual
         for t in range(T):
-            for k in range(1, self.data.K):
+            for k in range(2, self.data.K):
                 for e, iv in enumerate(transport_intervals):
                     transp += (iv['fixed_cost'] * self.f_freight[k, t, e].solution_value() +
                                iv['var_cost_per_unit'] * self.y_freight[k, t, e].solution_value())
