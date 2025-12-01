@@ -134,8 +134,8 @@ class SupplyChainData:
             {
                 "name": "Sup3",
                 "cumulative_capacity": expand_cap(sup3_cap, m),
-                "primary_cost": 600 ,      # <--- CHIA NHỎ
-                "secondary_cost": 1050 ,   # <--- CHIA NHỎ
+                "primary_cost": 600 * p_scale,      # <--- CHIA NHỎ
+                "secondary_cost": 1050 * p_scale,   # <--- CHIA NHỎ
                 "min_order": 50,
                 "price_intervals": [{"max_q": 100, "price": 110}, {"max_q": 400, "price": 80}, {"max_q": 1000, "price": 60}]
             }
