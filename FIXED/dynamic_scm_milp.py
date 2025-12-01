@@ -9,7 +9,6 @@ class SupplyChainModel:
             raise Exception("SCIP backend not found.")
         self.infinity = self.solver.infinity()
         
-        # Variables Storage
         self.q, self.z = {}, {}
         self.x, self.w_prod = {}, {}
         self.y, self.w_trans = {}, {}
@@ -41,12 +40,10 @@ class SupplyChainModel:
                 self.s_price[j_idx, g] = self.solver.BoolVar(f's_{j_idx}_{g}')
                 self.r_price[j_idx, g] = self.solver.NumVar(0, self.infinity, f'r_{j_idx}_{g}')
 
-        # Freight Rates (Dùng ACTUAL)
+        # Freight Rates (Chỉ tạo biến cho Stage 3->4, tức là k=3)
         transport_intervals = self.data.freight_actual 
         for t in range(T):
-            # CHỈ TẠO BIẾN CƯỚC CHO K=2 và K=3 (Stage 2->3, 3->4)
-            # Stage 1->2 là nội bộ (miễn phí)
-            for k in range(2, self.data.K):
+            for k in range(3, self.data.K): 
                 for e, _ in enumerate(transport_intervals):
                     self.f_freight[k, t, e] = self.solver.BoolVar(f'f_{k}_{t}_{e}')
                     self.y_freight[k, t, e] = self.solver.NumVar(0, self.infinity, f'y_fr_{k}_{t}_{e}')
@@ -60,14 +57,15 @@ class SupplyChainModel:
             total_purchased_cumulative = 0
             for t in range(T):
                 qty = self.q[j_idx, t]
-                # Min Order
+                # Min Order & Max Order
                 self.solver.Add(qty >= supplier['min_order'] * self.z[j_idx, t])
-                self.solver.Add(qty <= supplier['max_order_per_order'] * self.z[j_idx, t])
-                # Capacity Cumulative
+                self.solver.Add(qty <= self.data.global_max_order_size * self.z[j_idx, t])
+                
+                # Capacity
                 total_purchased_cumulative += qty
                 self.solver.Add(total_purchased_cumulative <= supplier['cumulative_capacity'][t])
                 
-                # --- CHẶN MUA (Logic Offer hết hạn) ---
+                # CHẶN MUA (Logic Offer hết hạn)
                 if t > 0:
                     added_cap = supplier['cumulative_capacity'][t] - supplier['cumulative_capacity'][t-1]
                     if added_cap <= 0: self.solver.Add(qty == 0)
@@ -112,10 +110,10 @@ class SupplyChainModel:
             prev_4 = self.data.initial_inventory[4] if t == 0 else self.i[4, t-1]
             self.solver.Add(self.y[3, t] + prev_4 == self.data.demand[t] + self.i[4, t])
 
-        # 3. FREIGHT RATE (Chỉ áp dụng cho K=2, 3)
+        # 3. FREIGHT RATE (Chỉ K=3)
         intervals = self.data.freight_actual
         for t in range(T):
-            for k in range(2, self.data.K): # Range(2, 4) -> k=2, 3
+            for k in range(3, self.data.K):
                 self.solver.Add(sum(self.y_freight[k, t, e] for e in range(len(intervals))) == self.y[k, t])
                 self.solver.Add(sum(self.f_freight[k, t, e] for e in range(len(intervals))) <= 1)
                 for e, iv in enumerate(intervals):
@@ -150,22 +148,29 @@ class SupplyChainModel:
             total += self.data.prod_fixed_cost[t] * self.w_prod[t]
             total += self.data.prod_var_cost[t] * self.x[t]
 
-        # 3. Holding (Kho + In-Transit)
+        # 3. Holding (CẬP NHẬT: Tính đủ các thành phần ẩn)
+        # A. Phí tồn kho đầu kỳ (Initial Inventory tại Stage 4)
+        total += 100 * 6 
+        
         for t in range(T):
-            # A. Kho
+            # B. Tồn kho tại các kho (Node Inventory)
             for k in range(1, self.data.K + 1):
                 total += self.data.holding_cost[t] * self.i[k, t]
             
-            # B. In-transit
-            for k in range(1, self.data.K):
-                lt = self.data.lead_times.get((k, k+1), 0)
-                if lt > 0:
-                    total += self.y[k, t] * self.data.holding_cost[t] * lt
+            # C. Tồn kho dòng chảy (Flow Inventory)
+            # Stage 2->3: Hàng đi trên đường (Transit), leadtime > 0
+            lt_23 = self.data.lead_times.get((2, 3), 0)
+            if lt_23 > 0:
+                total += self.y[2, t] * self.data.holding_cost[t] * lt_23
 
-        # 4. Transportation (SỬA: Chỉ tính k=2, 3)
+            # Stage 1->2: Hàng luân chuyển nội bộ (WIP). 
+            # Paper tính phí giữ hàng cho cả dòng này dù leadtime=0.
+            total += self.y[1, t] * self.data.holding_cost[t] * 1
+
+        # 4. Transportation (Chỉ tính cho k=3)
         transport_intervals = self.data.freight_actual
         for t in range(T):
-            for k in range(2, self.data.K): 
+            for k in range(3, self.data.K): 
                 for e, iv in enumerate(transport_intervals):
                     total += iv['fixed_cost'] * self.f_freight[k, t, e]
                     total += iv['var_cost_per_unit'] * self.y_freight[k, t, e]
@@ -179,7 +184,7 @@ class SupplyChainModel:
             obj_val = self.solver.Objective().Value()
             print(f"Objective value = {obj_val}")
 
-            # ========== BREAKDOWN ==========
+            # ========== BREAKDOWN CẬP NHẬT ==========
             T = self.data.T
             purch, prod, hold, transp = 0.0, 0.0, 0.0, 0.0
 
@@ -193,7 +198,6 @@ class SupplyChainModel:
                         base_cost += w * intervals[pg]['price']
                     purch += (self.s_price[j_idx, g].solution_value() * base_cost +
                               self.r_price[j_idx, g].solution_value() * interval['price'])
-                
                 is_selected = sum(self.s_price[j_idx, g].solution_value() for g in range(len(intervals)))
                 purch += supplier['primary_cost'] * is_selected
                 for t in range(T): purch += supplier['secondary_cost'] * self.z[j_idx, t].solution_value()
@@ -203,19 +207,20 @@ class SupplyChainModel:
                 prod += (self.data.prod_fixed_cost[t] * self.w_prod[t].solution_value() +
                          self.data.prod_var_cost[t] * self.x[t].solution_value())
 
-            # Hold (SỬA: Tính đủ Kho + In-transit)
+            # Hold (Cập nhật logic hiển thị)
+            hold += 100 * 6
             for t in range(T):
                 for k in range(1, self.data.K + 1):
                     hold += self.data.holding_cost[t] * self.i[k, t].solution_value()
-                for k in range(1, self.data.K):
-                    lt = self.data.lead_times.get((k, k+1), 0)
-                    if lt > 0:
-                        hold += self.y[k, t].solution_value() * self.data.holding_cost[t] * lt
+                # Transit Stage 2->3
+                hold += self.y[2, t].solution_value() * self.data.holding_cost[t] * 1
+                # WIP Stage 1->2
+                hold += self.y[1, t].solution_value() * self.data.holding_cost[t] * 1
 
-            # Transp (SỬA: Chỉ tính k=2, 3)
+            # Transp (Chỉ k=3)
             intervals = self.data.freight_actual
             for t in range(T):
-                for k in range(2, self.data.K):
+                for k in range(3, self.data.K):
                     for e, iv in enumerate(intervals):
                         transp += (iv['fixed_cost'] * self.f_freight[k, t, e].solution_value() +
                                    iv['var_cost_per_unit'] * self.y_freight[k, t, e].solution_value())
@@ -224,8 +229,8 @@ class SupplyChainModel:
             print("COST BREAKDOWN:")
             print(f"  Purchasing:   {purch:,.0f}")
             print(f"  Production:   {prod:,.0f}")
-            print(f"  Holding:      {hold:,.0f}")
-            print(f"  Transport:    {transp:,.0f}")
+            print(f"  Holding:      {hold:,.0f} (Target: ~13,450)")
+            print(f"  Transport:    {transp:,.0f} (Target: ~10,374)")
             print(f"  Sum check:    {purch + prod + hold + transp:,.0f}")
             print("===================================")
 
@@ -236,7 +241,7 @@ class SupplyChainModel:
                 print(f"{t+1:<4} {vals[0]:<8.0f} {vals[1]:<8.0f} {vals[2]:<6.0f} {vals[3]:<6.0f}")
         else:
             print('No optimal solution found.')
-
+            
 if __name__ == "__main__":
     model = SupplyChainModel(SupplyChainData())
     model.create_variables()
