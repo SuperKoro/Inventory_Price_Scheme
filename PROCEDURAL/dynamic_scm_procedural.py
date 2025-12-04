@@ -43,7 +43,7 @@ def create_variables(solver, data):
             if k < data.K:
                 y[k, t] = solver.NumVar(0, infinity, f'y_{k}_{t}')
                 w_trans[k, t] = solver.BoolVar(f'w_trans_{k}_{t}')
-    
+
     # Pricing variables
     for j_idx, supplier in enumerate(data.suppliers):
         for g, _ in enumerate(supplier['price_intervals']):

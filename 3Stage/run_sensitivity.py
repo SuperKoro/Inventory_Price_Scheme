@@ -2,15 +2,14 @@ import time
 from data_loader import SupplyChainData
 from dynamic_scm_milp import SupplyChainModel
 
-# Giả sử bài toán gốc có 5 kỳ và tổng horizon là 60 ngày => mỗi kỳ gốc dài 12 ngày
 BASE_PERIOD_DAYS = 12
 
-def solve_one(m, mode):
+def solve_one(m, mode, num_stages=3):
     """
-    Chạy 1 lần mô hình với hệ số m và mode ('Pm' hoặc 'Pmd').
-    Trả về: (data, model, objective_value, cpu_time)
+    Run model once with given m, mode, and num_stages.
+    Returns: (data, model, objective_value, cpu_time)
     """
-    data = SupplyChainData(m=m, mode=mode)
+    data = SupplyChainData(m=m, mode=mode, num_stages=num_stages)
     model = SupplyChainModel(data)
 
     start_time = time.time()
@@ -31,7 +30,7 @@ def solve_one(m, mode):
 
 def print_purchasing_plan_comparison(model_pm, model_pmd, T, m):
     """
-    In bảng so sánh purchasing plan giữa Pm và Pmd
+    Print purchasing plan comparison between Pm and Pmd
     """
     plan_pm = model_pm.get_purchasing_plan()
     plan_pmd = model_pmd.get_purchasing_plan()
@@ -53,12 +52,14 @@ def print_purchasing_plan_comparison(model_pm, model_pmd, T, m):
     print("-" * 80)
 
 def run_analysis():
-    # Các giá trị m giống trong paper: 1, 2, 3, 4
-    m_values = [1, 2, 3, 4]
+    """
+    Table 13 style: 3-stage model with m=1,2 for both Pm and Pmd
+    """
+    m_values = [1, 2]  # Paper Table 13 uses m=1,2 for 3-stage
+    num_stages = 3
 
-    # ========== BẢNG TỔNG HỢP KIỂU TABLE 8 ==========
     print("=" * 110)
-    print("SENSITIVITY ANALYSIS - TABLE 8 FORMAT (Pm vs Pmd)")
+    print(f"3-STAGE MODEL SENSITIVITY ANALYSIS (Pm vs Pmd)")
     print("=" * 110)
     print(
         f"{'m':<3} | {'Len/Per(d)':<10} | {'Periods':<7} | "
@@ -70,16 +71,12 @@ def run_analysis():
     results = []
 
     for m in m_values:
-        # 1) Chạy model với Pm (demand dồn cuối kỳ con)
-        data_pm, model_pm, obj_pm, cpu_pm = solve_one(m, mode='Pm')
-
-        # 2) Chạy model với Pmd (demand chia đều các kỳ con)
-        data_pmd, model_pmd, obj_pmd, cpu_pmd = solve_one(m, mode='Pmd')
+        data_pm, model_pm, obj_pm, cpu_pm = solve_one(m, mode='Pm', num_stages=num_stages)
+        data_pmd, model_pmd, obj_pmd, cpu_pmd = solve_one(m, mode='Pmd', num_stages=num_stages)
 
         T = data_pm.T
         len_per = BASE_PERIOD_DAYS / m
 
-        # In 1 dòng giống cấu trúc Table 8
         print(
             f"{m:<3} | {len_per:<10.2f} | {T:<7} | "
             f"{obj_pm:>12,.0f} | {cpu_pm:>10.4f} | "
@@ -93,15 +90,13 @@ def run_analysis():
             'model_pm': model_pm,
             'model_pmd': model_pmd,
             'obj_pm': obj_pm,
-            'obj_pmd': obj_pmd,
-            'cpu_pm': cpu_pm,
-            'cpu_pmd': cpu_pmd
+            'obj_pmd': obj_pmd
         })
 
     print("-" * 110)
     print()
 
-    # ========== BREAKDOWN COST CHO TỪNG m ==========
+    # Cost Breakdown
     print("=" * 110)
     print("COST BREAKDOWN FOR EACH m")
     print("=" * 110)
@@ -116,7 +111,7 @@ def run_analysis():
         breakdown_pmd = model_pmd.get_cost_breakdown()
         
         print(f"\n{'='*60}")
-        print(f"m = {m} | Periods = {T}")
+        print(f"m = {m} | Periods = {T} | 3-STAGE MODEL")
         print(f"{'='*60}")
         print(f"{'Cost Component':<20} | {'Pm':>15} | {'Pmd':>15} | {'Diff':>12}")
         print("-" * 60)
@@ -132,7 +127,7 @@ def run_analysis():
         
         print("-" * 60)
 
-    # ========== PURCHASING PLAN CHO TỪNG m ==========
+    # Purchasing Plan
     print("\n" + "=" * 110)
     print("PURCHASING PLANS FOR EACH m")
     print("=" * 110)
@@ -142,11 +137,10 @@ def run_analysis():
         T = res['T']
         model_pm = res['model_pm']
         model_pmd = res['model_pmd']
-        
         print_purchasing_plan_comparison(model_pm, model_pmd, T, m)
 
     print("\n" + "=" * 110)
-    print("DONE SENSITIVITY ANALYSIS.")
+    print("DONE 3-STAGE SENSITIVITY ANALYSIS.")
     print("=" * 110)
 
 if __name__ == "__main__":

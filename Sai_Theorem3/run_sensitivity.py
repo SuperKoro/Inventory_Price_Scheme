@@ -2,13 +2,12 @@ import time
 from data_loader import SupplyChainData
 from dynamic_scm_milp import SupplyChainModel
 
-# Giả sử bài toán gốc có 5 kỳ và tổng horizon là 60 ngày => mỗi kỳ gốc dài 12 ngày
 BASE_PERIOD_DAYS = 12
 
 def solve_one(m, mode):
     """
-    Chạy 1 lần mô hình với hệ số m và mode ('Pm' hoặc 'Pmd').
-    Trả về: (data, model, objective_value, cpu_time)
+    Run model once with given m and mode ('Pm', 'Pmd', or 'Pmd_nc').
+    Returns: (data, model, objective_value, cpu_time)
     """
     data = SupplyChainData(m=m, mode=mode)
     model = SupplyChainModel(data)
@@ -31,7 +30,7 @@ def solve_one(m, mode):
 
 def print_purchasing_plan_comparison(model_pm, model_pmd, T, m):
     """
-    In bảng so sánh purchasing plan giữa Pm và Pmd
+    Print purchasing plan comparison between Pm and Pmd
     """
     plan_pm = model_pm.get_purchasing_plan()
     plan_pmd = model_pmd.get_purchasing_plan()
@@ -53,10 +52,11 @@ def print_purchasing_plan_comparison(model_pm, model_pmd, T, m):
     print("-" * 80)
 
 def run_analysis():
-    # Các giá trị m giống trong paper: 1, 2, 3, 4
+    """
+    Table 8: Compare Pm vs Pmd (with Theorem 3 condition)
+    """
     m_values = [1, 2, 3, 4]
 
-    # ========== BẢNG TỔNG HỢP KIỂU TABLE 8 ==========
     print("=" * 110)
     print("SENSITIVITY ANALYSIS - TABLE 8 FORMAT (Pm vs Pmd)")
     print("=" * 110)
@@ -70,16 +70,12 @@ def run_analysis():
     results = []
 
     for m in m_values:
-        # 1) Chạy model với Pm (demand dồn cuối kỳ con)
         data_pm, model_pm, obj_pm, cpu_pm = solve_one(m, mode='Pm')
-
-        # 2) Chạy model với Pmd (demand chia đều các kỳ con)
         data_pmd, model_pmd, obj_pmd, cpu_pmd = solve_one(m, mode='Pmd')
 
         T = data_pm.T
         len_per = BASE_PERIOD_DAYS / m
 
-        # In 1 dòng giống cấu trúc Table 8
         print(
             f"{m:<3} | {len_per:<10.2f} | {T:<7} | "
             f"{obj_pm:>12,.0f} | {cpu_pm:>10.4f} | "
@@ -93,15 +89,13 @@ def run_analysis():
             'model_pm': model_pm,
             'model_pmd': model_pmd,
             'obj_pm': obj_pm,
-            'obj_pmd': obj_pmd,
-            'cpu_pm': cpu_pm,
-            'cpu_pmd': cpu_pmd
+            'obj_pmd': obj_pmd
         })
 
     print("-" * 110)
     print()
 
-    # ========== BREAKDOWN COST CHO TỪNG m ==========
+    # Cost Breakdown
     print("=" * 110)
     print("COST BREAKDOWN FOR EACH m")
     print("=" * 110)
@@ -132,7 +126,7 @@ def run_analysis():
         
         print("-" * 60)
 
-    # ========== PURCHASING PLAN CHO TỪNG m ==========
+    # Purchasing Plan
     print("\n" + "=" * 110)
     print("PURCHASING PLANS FOR EACH m")
     print("=" * 110)
@@ -142,12 +136,70 @@ def run_analysis():
         T = res['T']
         model_pm = res['model_pm']
         model_pmd = res['model_pmd']
-        
         print_purchasing_plan_comparison(model_pm, model_pmd, T, m)
 
     print("\n" + "=" * 110)
     print("DONE SENSITIVITY ANALYSIS.")
     print("=" * 110)
 
+def run_analysis_table11():
+    """
+    Table 11 simulation:
+    - M^m   : mode='Pm'
+    - M^m_d : mode='Pmd'    (WITH Theorem 3 condition)
+    - M^m_d_nc : mode='Pmd_nc' (WITHOUT condition - non-uniform distribution)
+    """
+    m_values = [1, 2, 3, 4]
+
+    print("\n" + "=" * 130)
+    print("SENSITIVITY ANALYSIS - TABLE 11 FORMAT (With vs Without Initial Condition - Theorem 3)")
+    print("=" * 130)
+    print(
+        f"{'m':<3} | {'Len/Per(d)':<10} | {'Periods':<7} | "
+        f"{'M^m Cost':>12} | "
+        f"{'M^m_d Cost':>12} | {'Dev_d':>10} | "
+        f"{'M^m_d_nc Cost':>15} | {'Dev_d_nc':>10}"
+    )
+    print("-" * 130)
+
+    for m in m_values:
+        # M^m (Pm)
+        data_pm, model_pm, cost_Mm, cpu_pm = solve_one(m, mode='Pm')
+        # M^m_d with condition
+        data_pmd, model_pmd, cost_Mmd, cpu_pmd = solve_one(m, mode='Pmd')
+        # M^m_d without condition
+        data_pmd_nc, model_pmd_nc, cost_Mmd_nc, cpu_pmd_nc = solve_one(m, mode='Pmd_nc')
+
+        T = data_pm.T
+        len_per = BASE_PERIOD_DAYS / m
+
+        dev_d = cost_Mmd - cost_Mm          # deviation of M^m_d (with) from M^m
+        dev_d_nc = cost_Mmd_nc - cost_Mm    # deviation of M^m_d_nc (without) from M^m
+
+        print(
+            f"{m:<3} | {len_per:<10.2f} | {T:<7} | "
+            f"{cost_Mm:>12,.0f} | "
+            f"{cost_Mmd:>12,.0f} | {dev_d:>+10,.0f} | "
+            f"{cost_Mmd_nc:>15,.0f} | {dev_d_nc:>+10,.0f}"
+        )
+
+    print("-" * 130)
+    print("DONE TABLE 11 STYLE ANALYSIS.")
+    print("=" * 130)
+
+    # Demand pattern explanation
+    print("\n" + "=" * 80)
+    print("DEMAND PATTERN EXPLANATION:")
+    print("=" * 80)
+    print("  Pm     : [0, 0, ..., val]              -> All at LAST sub-period")
+    print("  Pmd    : [val/m, val/m, ...]           -> UNIFORM (WITH Theorem 3 condition)")
+    print("  Pmd_nc : [0.4*val, 0.3*val, 0.2*val, 0.1*val] (m=4)")
+    print("           -> NON-UNIFORM distribution (WITHOUT Theorem 3 condition)")
+    print("=" * 80)
+
 if __name__ == "__main__":
+    # Table 8 (Pm vs Pmd standard)
     run_analysis()
+
+    # Table 11 (Pm vs Pmd with condition vs Pmd_nc without condition)
+    run_analysis_table11()

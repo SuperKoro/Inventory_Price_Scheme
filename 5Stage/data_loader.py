@@ -1,11 +1,11 @@
 class SupplyChainData:
-    def __init__(self, m=1, mode='Pm'):
+    def __init__(self, m=1, mode='Pm', num_stages=4):
         self.m = m
         self.mode = mode
+        self.K = num_stages  # Number of stages (4 or 5)
         
         # --- 1. THAM SỐ GỐC (BASE PARAMETERS - m=1) ---
         self.base_T = 5  # Lưu lại số kỳ gốc để dùng trong Model
-        self.K = 4
         
         base_demand = [100, 200, 250, 300, 200]
         base_holding_cost = [5, 5, 5, 6, 6]
@@ -65,14 +65,43 @@ class SupplyChainData:
             
         self.inventory_capacity = 400
 
-        # D. Xử lý Lead Time
-        self.lead_times = {
-            (1, 2): 0 ,
-            (2, 3): 1 * m, 
-            (3, 4): 0 
-        }
+        # C. Production Site 2 (Stage 3) - chỉ dùng khi num_stages=5
+        # Dữ liệu từ Table 12
+        base_prod2_fixed = [3000, 3000, 3000, 3000, 3200]
+        base_prod2_var   = [15, 15, 15, 16, 16]
+        base_prod2_cap   = [300, 300, 300, 300, 300]
         
-        self.initial_inventory = {1: 0, 2: 0, 3: 0, 4: 100}
+        self.prod2_fixed_cost = []
+        for f in base_prod2_fixed:
+            self.prod2_fixed_cost.extend([f] * m)
+            
+        self.prod2_var_cost = []
+        for v in base_prod2_var:
+            self.prod2_var_cost.extend([v] * m)
+            
+        self.prod2_capacity = []
+        for c in base_prod2_cap:
+            self.prod2_capacity.extend([c] * m)
+
+        # D. Xử lý Lead Time và Initial Inventory (phụ thuộc num_stages)
+        if self.K == 4:
+            self.lead_times = {
+                (1, 2): 0,
+                (2, 3): 1 * m, 
+                (3, 4): 0 
+            }
+            self.initial_inventory = {1: 0, 2: 0, 3: 0, 4: 100}
+        elif self.K == 5:
+            # 5-stage: Mfg1 -> WH1 -> Mfg2 -> WH2 -> Customer
+            self.lead_times = {
+                (1, 2): 0,       # Mfg1 -> WH1
+                (2, 3): 1 * m,   # WH1 -> Mfg2 (có LT=1)
+                (3, 4): 0,       # Mfg2 -> WH2
+                (4, 5): 0        # WH2 -> Customer
+            }
+            self.initial_inventory = {1: 0, 2: 0, 3: 0, 4: 0, 5: 100}
+        else:
+            raise ValueError(f"num_stages={self.K} chưa được hỗ trợ. Chỉ hỗ trợ 4 hoặc 5.")
 
         # --- 3. DỮ LIỆU NHÀ CUNG CẤP ---
         self.global_min_order_first = 50

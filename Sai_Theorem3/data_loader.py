@@ -18,7 +18,7 @@ class SupplyChainData:
         # --- 2. BIẾN ĐỔI DỮ LIỆU ---
         self.T = self.base_T * m 
         
-        # A. Xử lý Nhu cầu (Demand) - Giữ nguyên logic cũ
+        # A. Xử lý Nhu cầu (Demand)
         self.demand = [0] * self.T
         if m == 1:
             self.demand = base_demand
@@ -26,21 +26,51 @@ class SupplyChainData:
             for t_old in range(self.base_T):
                 val = base_demand[t_old]
                 if mode == 'Pm':
+                    # M^m: dồn hết nhu cầu vào sub-period CUỐI cùng của mỗi block
                     idx = (t_old + 1) * m - 1 
                     self.demand[idx] = val
                 elif mode == 'Pmd':
+                    # M^m_d ĐÚNG điều kiện Thm 3: chia đều nhu cầu
                     dist_val = val / m
                     for sub in range(m):
                         self.demand[t_old * m + sub] = dist_val
+                elif mode == 'Pmd_nc':
+                    # M^m_d SAI điều kiện: phân bố KHÔNG đều (vi phạm Theorem 3)
+                    # Nhưng vẫn phủ toàn block để model khả thi
+                    
+                    # Định nghĩa weights theo từng m
+                    # Gần uniform nhưng VẪN vi phạm điều kiện (không hoàn toàn đều)
+                    if m == 2:
+                        weights = [0.6, 0.4]  # so với uniform [0.5, 0.5]
+                    elif m == 3:
+                        weights = [0.4, 0.35, 0.25]  # so với uniform [0.333, 0.333, 0.333]
+                    elif m == 4:
+                        weights = [0.28, 0.26, 0.24, 0.22]  # so với uniform [0.25, 0.25, 0.25, 0.25]
+                    else:
+                        # Fallback: gần đều nhưng có chút biến động
+                        base = 1.0 / m
+                        weights = [base + (m - i - m/2) * 0.01 for i in range(m)]
+                        s = sum(weights)
+                        weights = [w / s for w in weights]
+                    
+                    # Normalize để đảm bảo tổng = 1
+                    s = sum(weights)
+                    weights = [w / s for w in weights]
+                    
+                    for sub in range(m):
+                        idx = t_old * m + sub
+                        self.demand[idx] = val * weights[sub]
+                else:
+                    raise ValueError(f"Unknown mode: {mode}")
 
-        # B. Xử lý Chi phí & Năng lực (SỬA LỖI TẠI ĐÂY)
+        # B. Xử lý Chi phí & Năng lực
         
-        # 1. Holding cost: Vẫn chia m (đúng theo định lý 2 condition i [cite: 806])
+        # 1. Holding cost: Vẫn chia m (đúng theo định lý 2 condition i)
         self.holding_cost = []
         for h in base_holding_cost:
             self.holding_cost.extend([h / m] * m)
             
-        # 2. Production Fixed Cost: KHÔNG CHIA m (Theo condition ii )
+        # 2. Production Fixed Cost: KHÔNG CHIA m (Theo condition ii)
         # Model sẽ dùng biến w_group để tính phí này 1 lần cho cả nhóm
         self.prod_fixed_cost = []
         for f in base_prod_fixed:
@@ -57,8 +87,7 @@ class SupplyChainData:
         for c in base_prod_cap:
             self.prod_capacity.extend([c] * m)
             
-        # 5. Transport Capacity: Giữ nguyên logic cũ (chia m) vì bài báo không nhấn mạnh
-        # thay đổi capacity vận chuyển, ta giả định nó chia đều theo thời gian.
+        # 5. Transport Capacity: Giữ nguyên logic cũ (chia m)
         self.trans_capacity = []
         for c in base_trans_cap:
             self.trans_capacity.extend([c / m] * m)
@@ -95,32 +124,32 @@ class SupplyChainData:
             {
                 "name": "Sup1_Offer1",
                 "cumulative_capacity": expand_cap(sup1_off1_cap, m),
-                "primary_cost": 550,     # <--- GIỮ NGUYÊN
-                "secondary_cost": 1000,  # <--- GIỮ NGUYÊN
+                "primary_cost": 550,
+                "secondary_cost": 1000,
                 "min_order": 50,
                 "price_intervals": [{"max_q": 50, "price": 95}, {"max_q": 150, "price": 80}, {"max_q": 300, "price": 70}, {"max_q": 450, "price": 60}]
             },
             {
                 "name": "Sup1_Offer2",
                 "cumulative_capacity": expand_cap(sup1_off2_cap, m),
-                "primary_cost": 550,     # <--- GIỮ NGUYÊN
-                "secondary_cost": 1000,  # <--- GIỮ NGUYÊN
+                "primary_cost": 550,
+                "secondary_cost": 1000,
                 "min_order": 50,
                 "price_intervals": [{"max_q": 150, "price": 95}, {"max_q": 250, "price": 80}, {"max_q": 400, "price": 70}]
             },
             {
                 "name": "Sup2",
                 "cumulative_capacity": expand_cap(sup2_cap, m),
-                "primary_cost": 500,     # <--- GIỮ NGUYÊN
-                "secondary_cost": 1000,  # <--- GIỮ NGUYÊN
+                "primary_cost": 500,
+                "secondary_cost": 1000,
                 "min_order": 50,
                 "price_intervals": [{"max_q": 200, "price": 120}, {"max_q": 400, "price": 100}, {"max_q": 650, "price": 85}, {"max_q": 900, "price": 70}, {"max_q": 1200, "price": 60}]
             },
             {
                 "name": "Sup3",
                 "cumulative_capacity": expand_cap(sup3_cap, m),
-                "primary_cost": 600,     # <--- GIỮ NGUYÊN
-                "secondary_cost": 1050,  # <--- GIỮ NGUYÊN
+                "primary_cost": 600,
+                "secondary_cost": 1050,
                 "min_order": 50,
                 "price_intervals": [{"max_q": 100, "price": 110}, {"max_q": 400, "price": 80}, {"max_q": 1000, "price": 60}]
             }
