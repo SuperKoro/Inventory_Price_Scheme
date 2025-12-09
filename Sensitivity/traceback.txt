@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "g:\IU copy\OneDrive\International University\4rd year\sem 1\Inventory\project\Price_Scheme\Sensitivity\debug_run.py", line 6, in <module>
+    run_sensitivity.run_analysis()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\IU copy\OneDrive\International University\4rd year\sem 1\Inventory\project\Price_Scheme\Sensitivity\run_sensitivity.py", line 74, in run_analysis
+    data_pm, model_pm, obj_pm, cpu_pm = solve_one(m, mode='Pm')
+                                        ~~~~~~~~~^^^^^^^^^^^^^^
+  File "g:\IU copy\OneDrive\International University\4rd year\sem 1\Inventory\project\Price_Scheme\Sensitivity\run_sensitivity.py", line 18, in solve_one
+    model.add_constraints()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\IU copy\OneDrive\International University\4rd year\sem 1\Inventory\project\Price_Scheme\Sensitivity\dynamic_scm_milp.py", line 108, in add_constraints
+    self.solver.Add(in_1 + prev_1 == self.x[t] + self.i[1, t])
+                                                 ~~~~~~^^^^^^
+KeyError: (1, 0)

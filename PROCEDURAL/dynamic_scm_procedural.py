@@ -3,7 +3,7 @@ from data_loader import SupplyChainData
 
 
 def create_solver():
-    """Khởi tạo SCIP solver"""
+    """Initialize SCIP solver"""
     solver = pywraplp.Solver.CreateSolver('SCIP')
     if not solver:
         raise Exception("SCIP backend not found.")
@@ -12,14 +12,14 @@ def create_solver():
 
 def create_variables(solver, data):
     """
-    Tạo tất cả decision variables
-    Returns: dict chứa tất cả variables
+    Create all decision variables
+    Returns: dict containing all variables
     """
     print("Creating variables...")
     T = data.T
     infinity = solver.infinity()
     
-    # Khởi tạo dictionaries để lưu variables
+    # Initialize dictionaries to store variables
     q, z = {}, {}
     x, w_prod = {}, {}
     y, w_trans = {}, {}
@@ -58,7 +58,7 @@ def create_variables(solver, data):
                 f_freight[k, t, e] = solver.BoolVar(f'f_{k}_{t}_{e}')
                 y_freight[k, t, e] = solver.NumVar(0, infinity, f'y_fr_{k}_{t}_{e}')
     
-    # Return tất cả variables trong 1 dict
+    # Return all variables in one dict
     return {
         'q': q, 'z': z,
         'x': x, 'w_prod': w_prod,
@@ -70,7 +70,7 @@ def create_variables(solver, data):
 
 
 def add_supplier_constraints(solver, data, vars):
-    """Thêm ràng buộc nhà cung cấp (Eq. 16-26)"""
+    """Add supplier constraints (Eq. 16-26)"""
     T = data.T
     q = vars['q']
     z = vars['z']
@@ -91,7 +91,7 @@ def add_supplier_constraints(solver, data, vars):
             total_purchased_cumulative += qty
             solver.Add(total_purchased_cumulative <= supplier['cumulative_capacity'][t])
             
-            # Logic bổ sung: Chặn mua nếu offer hết hạn
+            # Additional logic: Block purchase if offer expires
             if t > 0:
                 added_cap = supplier['cumulative_capacity'][t] - supplier['cumulative_capacity'][t-1]
                 if added_cap <= 0:
@@ -104,7 +104,7 @@ def add_supplier_constraints(solver, data, vars):
         total_qty_horizon = sum(q[j_idx, t] for t in range(T))
         intervals = supplier['price_intervals']
         
-        # Eq. (21): Chọn tối đa 1 khoảng giá
+        # Eq. (21): Select maximum 1 price interval
         solver.Add(sum(s_price[j_idx, g] for g in range(len(intervals))) <= 1)
         
         # Eq. (22), (23): Quantity = sum of intervals
@@ -119,7 +119,7 @@ def add_supplier_constraints(solver, data, vars):
 
 
 def add_flow_balance_constraints(solver, data, vars):
-    """Thêm ràng buộc cân bằng dòng chảy (Eq. 27-30)"""
+    """Add flow balance constraints (Eq. 27-30)"""
     T = data.T
     q = vars['q']
     x = vars['x']
@@ -144,7 +144,7 @@ def add_flow_balance_constraints(solver, data, vars):
         # Eq. (32): Transportation capacity
         solver.Add(y[2, t] <= data.trans_capacity[t] * w_trans[2, t])
         
-        # Eq. (29): Stage 3 - Regional Warehouse (với lead time)
+        # Eq. (29): Stage 3 - Regional Warehouse (with lead time)
         in_3 = 0
         lt = data.lead_times[(2, 3)]
         if t >= lt:
@@ -159,7 +159,7 @@ def add_flow_balance_constraints(solver, data, vars):
 
 
 def add_freight_constraints(solver, data, vars):
-    """Thêm ràng buộc cước vận chuyển (Eq. 34-37)"""
+    """Add freight constraints (Eq. 34-37)"""
     T = data.T
     y = vars['y']
     f_freight = vars['f_freight']
@@ -169,10 +169,10 @@ def add_freight_constraints(solver, data, vars):
     
     for t in range(T):
         for k in range(3, data.K):
-            # Eq. (36): Tổng quantity trong các khoảng
+            # Eq. (36): Total quantity in intervals
             solver.Add(sum(y_freight[k, t, e] for e in range(len(intervals))) == y[k, t])
             
-            # Eq. (37): Chọn tối đa 1 khoảng cước
+            # Eq. (37): Select maximum 1 freight interval
             solver.Add(sum(f_freight[k, t, e] for e in range(len(intervals))) <= 1)
             
             for e, iv in enumerate(intervals):
@@ -184,20 +184,20 @@ def add_freight_constraints(solver, data, vars):
 
 
 def add_ending_inventory_constraints(solver, data, vars):
-    """Ràng buộc tồn kho cuối kỳ (Eq. 33 + bổ sung)"""
+    """Ending inventory constraints (Eq. 33 + additional)"""
     T = data.T
     i = vars['i']
     
-    # Eq. (33): Inventory capacity (đã enforce trong domain)
-    # Bổ sung: Target inventory cuối cùng
-    solver.Add(i[4, T-1] == 100)  # Stage 4 phải còn 100 units
+    # Eq. (33): Inventory capacity (already enforced in domain)
+    # Additional: Final target inventory
+    solver.Add(i[4, T-1] == 100)  # Stage 4 must have 100 units remaining
     for k in range(1, 4):
-        solver.Add(i[k, T-1] == 0)  # Các stage khác về 0
+        solver.Add(i[k, T-1] == 0)  # Other stages should be 0
 
 
 def set_objective(solver, data, vars):
     """
-    Định nghĩa hàm mục tiêu (Eq. 15)
+    Define objective function (Eq. 15)
     Min Z = (1) + (2) + (3) + (4) + (5)
     """
     print("Setting objective function...")
@@ -260,7 +260,7 @@ def set_objective(solver, data, vars):
 
 
 def solve_and_display(solver, data, vars):
-    """Giải model và hiển thị kết quả"""
+    """Solve model and display results"""
     print("Solving...")
     status = solver.Solve()
     
@@ -363,7 +363,6 @@ def main():
     # 6. Solve and display
     solve_and_display(solver, data, vars)
     
-    print("\n✅ Procedural version completed!")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ class SupplyChainData:
         self.m = m
         self.mode = mode
         
-        # --- 1. THAM SỐ GỐC (BASE PARAMETERS - m=1) ---
+        #  1. THAM SỐ GỐC (BASE PARAMETERS - m=1) 
         self.base_T = 5  # Lưu lại số kỳ gốc để dùng trong Model
         self.K = 4
         
@@ -33,9 +33,9 @@ class SupplyChainData:
                     for sub in range(m):
                         self.demand[t_old * m + sub] = dist_val
 
-        # B. Xử lý Chi phí & Năng lực (SỬA LỖI TẠI ĐÂY)
+        # B. Xử lý Chi phí & Năng lực 
         
-        # 1. Holding cost: Vẫn chia m (đúng theo định lý 2 condition i [cite: 806])
+        # 1. Holding cost: Vẫn chia m (đúng theo định lý 2 condition i )
         self.holding_cost = []
         for h in base_holding_cost:
             self.holding_cost.extend([h / m] * m)
