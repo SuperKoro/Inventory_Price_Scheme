@@ -138,19 +138,5 @@ Minimize: Purchasing + Production + Holding + Transportation
 - **Variables**: ~200 decision variables
 - **Constraints**: ~150 constraints
 
-## 📝 References
 
-Based on supply chain optimization model with:
-- Quantity discounts (All-unit and Incremental)
-- Lead times between stages
-- Multi-period planning horizon
-- Over-declaring freight optimization
 
-## 👥 Author
-
-International University - VNU HCMC
-Inventory Management Project
-
-## 📄 License
-
-Educational project for academic purposes.
