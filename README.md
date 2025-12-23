@@ -1,10 +1,10 @@
-# 📦 Supply Chain Optimization - Multi-Stage MILP Models
+#  Supply Chain Optimization - Multi-Stage MILP Models
 
 Comprehensive supply chain management optimization using **Mixed Integer Linear Programming (MILP)** to find optimal purchasing, production, and transportation plans with minimum total cost. This project implements **3-stage, 4-stage, and 5-stage** supply chain models with sensitivity analysis capabilities.
 
 ---
 
-## 🎯 Problem Overview
+##  Problem Overview
 
 This project solves **multi-stage, multi-period supply chain optimization problems** with:
 
@@ -26,7 +26,7 @@ This project solves **multi-stage, multi-period supply chain optimization proble
 
 ---
 
-## 📊 Cost Components
+##  Cost Components
 
 The model minimizes the following costs:
 
@@ -86,7 +86,16 @@ Price_Scheme/
 pip install ortools matplotlib numpy
 ```
 
-### 1️⃣ Run 4-Stage Sensitivity Analysis (MILP)
+### 1️⃣ Run Base Model (Main Implementation)
+
+```bash
+cd Basemodel
+python dynamic_scm_procedural.py
+```
+
+**Output:** Optimal cost, detailed cost breakdown, and purchasing plan for the base 4-stage supply chain
+
+### 2️⃣ Run 4-Stage Sensitivity Analysis (MILP)
 
 ```bash
 cd Sensitivity
@@ -95,7 +104,7 @@ python run_sensitivity.py
 
 **Output:** Console table + cost breakdown + purchasing plans for `m = [1, 2, 3, 4]`
 
-### 2️⃣ Generate Visualization Plots
+### 3️⃣ Generate Visualization Plots
 
 ```bash
 cd Sensitivity
@@ -103,15 +112,6 @@ python plot_sensitivity.py
 ```
 
 **Output:** PNG files showing cost breakdown, purchasing strategy, and Pm vs Pmd comparisons
-
-### 3️⃣ Run 5-Stage Model
-
-```bash
-cd 5Stage
-python run_sensitivity.py
-```
-
-**Output:** 5-stage analysis with 2 production sites
 
 ### 4️⃣ Run 3-Stage Model
 
@@ -121,6 +121,15 @@ python run_sensitivity.py
 ```
 
 **Output:** 3-stage analysis (single warehouse configuration)
+
+### 5️⃣ Run 5-Stage Model
+
+```bash
+cd 5Stage
+python run_sensitivity.py
+```
+
+**Output:** 5-stage analysis with 2 production sites
 
 ---
 
