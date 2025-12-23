@@ -2,7 +2,7 @@ import time
 from data_loader import SupplyChainData
 from dynamic_scm_milp import SupplyChainModel
 
-# Giả sử bài toán gốc có 5 kỳ và tổng horizon là 60 ngày => mỗi kỳ gốc dài 12 ngày
+
 BASE_PERIOD_DAYS = 12
 
 def solve_one(m, mode, num_stages=4):

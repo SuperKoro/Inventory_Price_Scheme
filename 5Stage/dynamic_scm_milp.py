@@ -77,8 +77,8 @@ class SupplyChainModel:
                     self.f_freight[k, t, e] = self.solver.BoolVar(f'f_{k}_{t}_{e}')
                     self.y_freight[k, t, e] = self.solver.NumVar(0, self.infinity, f'y_fr_{k}_{t}_{e}')
         
-        # Debug: in số biến
-        print(f"[DEBUG] Total variables: {self.solver.NumVariables()}")
+        
+        print(f"Total variables: {self.solver.NumVariables()}")
 
     def add_constraints(self):
         print("Adding constraints...")
@@ -245,8 +245,7 @@ class SupplyChainModel:
         for k in range(1, final_stage):
             self.solver.Add(self.i[k, T-1] == 0)
         
-        # Debug: in số constraints
-        print(f"[DEBUG] Total constraints: {self.solver.NumConstraints()}")
+        print(f"Total constraints: {self.solver.NumConstraints()}")
 
     def set_objective(self):
         print("Setting objective function...")

@@ -260,4 +260,3 @@ self.solver.Add(sum(self.y_freight[k, t, e] for e in range(len(intervals))) == s
 
 ---
 
-**Lưu ý:** Tất cả công thức đều được implement chính xác theo paper, chỉ khác ở ký hiệu index (Python 0-indexed).
